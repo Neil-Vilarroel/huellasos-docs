@@ -99,7 +99,21 @@
 </style>
 </head>
 <body>
-<div class="card">
+<!-- Card inicial: pide al usuario que confirme con click manual.
+     IMPORTANTE: no consumimos el token al cargar la página, porque
+     Gmail/Outlook ejecutan los JS de los links para escanear. Si
+     consumiéramos acá, el bot ya nos comería el token. -->
+<div class="card" id="confirmCard">
+  <div class="icon-circle" style="background: rgba(13,43,78,0.1); font-size:36px">📧</div>
+  <h1>Confirma tu cuenta</h1>
+  <p>Toca el botón para activar tu cuenta de Huella SOS.</p>
+  <button class="btn" id="confirmBtn" onclick="confirmAccount()" style="border:none;cursor:pointer;font-family:inherit">
+    Activar mi cuenta
+  </button>
+  <p class="hint">Esto te llevará a iniciar sesión.</p>
+</div>
+
+<div class="card" id="successCard" style="display:none">
   <div class="icon-circle">✓</div>
   <div class="pill">Cuenta verificada</div>
   <h1>¡Listo, ya eres parte de la red!</h1>
@@ -109,6 +123,68 @@
     ¿No se abrió la app? Buscá <strong>Huella SOS</strong> en tu teléfono e inicia sesión normalmente con tu correo y contraseña.
   </p>
 </div>
+
+<div class="card" id="errorCard" style="display:none">
+  <div class="icon-circle" style="background: rgba(255,111,97,0.2); font-size:36px">⚠️</div>
+  <h1 style="color: #d96459">Enlace no válido</h1>
+  <p id="errorMsg">Este enlace de confirmación ya fue usado o expiró. Si la cuenta ya está confirmada, simplemente inicia sesión normalmente.</p>
+  <a class="btn" href="io.supabase.huellasos://login-callback">Abrir Huella SOS</a>
+</div>
+
 <footer>© 2026 Huella SOS — Hecho con cariño 🐾</footer>
+
+<!-- Supabase JS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL  = 'https://jerzykqzcjszynkfkwpk.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_THk6vXVu7oOuoZVMasChBw_5qYHXHrB';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+function show(id) {
+  ['confirmCard', 'successCard', 'errorCard'].forEach(i => {
+    document.getElementById(i).style.display = i === id ? 'block' : 'none';
+  });
+}
+
+// Leemos el token al cargar pero NO lo consumimos
+const params = new URLSearchParams(window.location.search);
+const tokenHash = params.get('token_hash');
+const type = params.get('type') || 'signup';
+const code = params.get('code');
+
+if (!tokenHash && !code && !window.location.hash) {
+  document.getElementById('errorMsg').textContent =
+    'Este enlace no es válido. Si ya confirmaste tu cuenta, inicia sesión normalmente desde la app.';
+  show('errorCard');
+}
+
+async function confirmAccount() {
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Confirmando…';
+  try {
+    if (tokenHash) {
+      const { error } = await sb.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: type,
+      });
+      if (error) throw error;
+    } else if (code) {
+      const { error } = await sb.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+    } else {
+      await new Promise(r => setTimeout(r, 200));
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) throw new Error('No se pudo recuperar la sesión');
+    }
+    show('successCard');
+  } catch (e) {
+    document.getElementById('errorMsg').textContent =
+      'Este enlace ya fue usado o expiró (' + (e.message || e) + '). ' +
+      'Si tu cuenta ya está confirmada simplemente inicia sesión normalmente.';
+    show('errorCard');
+  }
+}
+</script>
 </body>
 </html>

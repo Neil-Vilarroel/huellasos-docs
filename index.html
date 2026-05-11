@@ -20,6 +20,30 @@
   footer { text-align: center; padding: 24px; color: #888; font-size: 12px; }
   .pill { display: inline-block; padding: 4px 10px; background: var(--accent); color: white; border-radius: 12px; font-size: 12px; font-weight: 600; }
 </style>
+<script>
+  // Red de seguridad: si Supabase manda a esta página con un código de
+  // recuperación o confirmación (porque algún email viejo usó la Site URL
+  // como redirect), lo desviamos a la página correcta automáticamente.
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.substring(1));
+    const type = params.get('type') || hash.get('type');
+    const code = params.get('code') || hash.get('code') ||
+                 hash.get('access_token');
+
+    if (!code) return; // visita normal, no hacemos nada
+
+    // El parámetro 'type' indica el flujo. Si viene 'recovery' es reset;
+    // todo lo demás (signup, magiclink, invite, email_change) lo tratamos
+    // como confirmación.
+    const target = type === 'recovery' ? 'reset-password.html'
+                                       : 'auth-confirmed.html';
+    // Preservamos query + hash para que la página destino pueda procesarlos.
+    const search = window.location.search;
+    const hashPart = window.location.hash;
+    window.location.replace(target + search + hashPart);
+  })();
+</script>
 </head>
 <body>
 <header>
